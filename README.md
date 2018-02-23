@@ -71,7 +71,7 @@ For every new experiment, you will need to create a new directory under `experim
 
 3. __Train__ your experiment. Simply run
 ```
-python train.py --data_dir data/64x64_SIGNS --model_dir experiments/base_model
+python train.py --data_dir data/64x64_SIGNS --model_dir experiments/base_model --noise_dir noisedir
 ```
 It will instantiate a model and train it on the training set following the parameters specified in `params.json`. It will also evaluate some metrics on the development set.
 
