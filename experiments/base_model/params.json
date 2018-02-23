@@ -1,0 +1,15 @@
+{
+    "learning_rate": 1e-3,
+    "batch_size": 32,
+    "num_epochs": 2,
+
+    "num_channels": 1,
+    "use_batch_norm": true,
+    "bn_momentum": 0.9,
+
+    "add_noise_augmentation": true,
+    "num_labels": 5,
+
+    "num_parallel_calls": 5,
+    "save_summary_steps": 1
+}
