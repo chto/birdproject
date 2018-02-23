@@ -17,7 +17,7 @@ def readfile(soundname):
     wave_fft = librosa.stft(wave, n_fft=512, hop_length=128, win_length=512)
     wave_fft = np.abs(wave_fft) ** 2
     wave_fft =  wave_fft[4:232]
-    image = np.log(wave_fft)
+    image = wave_fft
     return image 
 
 def batchreadFile(fileList):
@@ -27,7 +27,7 @@ def batchreadFile(fileList):
         randNoise=fileList[1]
         for i in xrange(len(randNoise)):
             signal += dampening_factor*readfile(randNoise[i])
-    return np.expand_dims(signal,axis=-1) 
+    return np.expand_dims(np.log(signal),axis=-1) 
  
 def readfiles(minibatch, noiseNames, add_noise_augmentation=False, number_of_thread=1):
     numberNoise=3
