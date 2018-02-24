@@ -26,11 +26,11 @@
 #SBATCH --nodes=1
 #################
 #memory per node; default is 4000 MB per CPU
-#SBATCH --mem=4G
+#SBATCH --mem=8G
 #################
 # Have SLURM send you an email when the job ends or fails, careful, the email could end up in your clutter folder
 #SBATCH --mail-type=END,FAIL # notifications for job done & fail
 #SBATCH --mail-user=YourSUNetID@stanford.edu
 
-
-srun python train.py --data_dir data/testdata/ --model_dir experiments/base_model --noise_dir data/testdata/noise/
+srun python train.py --data_dir data/testdata/ --model_dir experiments/BirdCLF/ --noise_dir data/testdata/noise/ --restore_from experiments/BirdCLF/best_weights/
+#srun python train.py --data_dir data/testdata/ --model_dir experiments/base_model --noise_dir data/testdata/noise/

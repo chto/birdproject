@@ -1,6 +1,7 @@
 """Define the model."""
 
 import tensorflow as tf
+from model import transfer 
 def build_model(is_training, inputs, params):
     """Compute logits of the model (output distribution)
 
@@ -24,13 +25,14 @@ def build_model(is_training, inputs, params):
     for i, c in enumerate(channels):
         with tf.variable_scope('block_{}'.format(i+1)):
             weight["w{0}".format(i)] = tf.get_variable("W{0}".format(i), [3,3,cold,c], initializer = tf.contrib.layers.xavier_initializer(seed=0))
-            newout = tf.nn.conv2d(out, weight["w{0}".format(i)], strides=[1,1,1,1], padding='SAME')
+            out = tf.nn.conv2d(out, weight["w{0}".format(i)], strides=[1,1,1,1], padding='SAME')
 #            if params.use_batch_norm:
 
   #              out = batch_norm_wrapper(out, is_training, decay = 0.999,epsilon=1E-8)
             cold=c
-            out = tf.nn.relu(newout)
+            out = tf.nn.relu(out)
     out = tf.nn.max_pool(out, ksize=[1,2,2,1], strides=[1,2,2,1],padding = 'VALID')
+    out = tf.contrib.layers.batch_norm(out,center=True,scale=True,is_training=is_training,scope="cnn-batch-norm")
 
 
     #out = tf.reshape(out, [-1, 4 * 4 * num_channels * 8])
@@ -39,14 +41,39 @@ def build_model(is_training, inputs, params):
 #        if params.use_batch_norm:
    #         out = batch_norm_wrapper(out, is_training,  decay = 0.999,epsilon=1E-8)
         out = tf.nn.relu(out)
-    out = tf.contrib.layers.flatten(out)
+    #out = tf.contrib.layers.flatten(out)
     with tf.variable_scope('fc_2'):
         logits = tf.contrib.layers.fully_connected(out, num_outputs=params.num_labels,activation_fn=None)
 
     return logits
 
+def transfermodel(is_training, inputs, params, data):
+    """Compute logits of the model (output distribution)
 
-def model_fn(mode, inputs, params, reuse=False):
+    Args:
+        is_training: (bool) whether we are training or not
+        inputs: (dict) contains the inputs of the graph (features, labels...)
+                this can be `tf.placeholder` or outputs of `tf.data`
+        params: (Params) hyperparameters
+
+    Returns:
+        output: (tf.Tensor) output of the model
+    """
+    out  = inputs["images"]
+    transfer.transferlearning(out, is_training, data)
+
+    with tf.variable_scope('fc_1'):
+        out = tf.contrib.layers.flatten(out)
+        out = tf.contrib.layers.fully_connected(out, num_outputs=256,activation_fn=None,weights_initializer=tf.contrib.layers.xavier_initializer(seed=0))
+
+    with tf.variable_scope('fc_2'):
+        out = tf.contrib.layers.flatten(out)
+        out = tf.contrib.layers.fully_connected(out, num_outputs=params.num_labels,activation_fn=None,weights_initializer=tf.contrib.layers.xavier_initializer(seed=0))
+    return tf.nn.softmax(out)
+     
+    return logits
+
+def model_fn(mode, inputs, params, reuse=False, transferdata=None):
     """Model function defining the graph operations.
 
     Args:
@@ -67,7 +94,10 @@ def model_fn(mode, inputs, params, reuse=False):
     # MODEL: define the layers of the model
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output distribution of the model and the predictions
-        logits = build_model(is_training, inputs, params)
+        if transferdata is not None:
+            logits = transfermodel(is_training, inputs, params, transferdata)
+        else:
+            logits = build_model(is_training, inputs, params)
         predictions = tf.argmax(logits, 1)
     # Define loss and accuracy
     label_argmax = tf.argmax(labels,1)
@@ -92,14 +122,11 @@ def model_fn(mode, inputs, params, reuse=False):
     # Metrics for evaluation using tf.metrics (average over whole dataset)
     with tf.variable_scope("metrics"):
         metrics = {
-            'accuracy': tf.contrib.metrics.streaming_accuracy(labels=label_argmax, predictions=tf.argmax(logits, 1)),
-            'loss': tf.contrib.metrics.streaming_mean(loss)
+            'accuracy': tf.contrib.metrics.streaming_accuracy(labels=tf.argmax(labels,1), predictions=tf.argmax(logits, 1)),
+            'loss': tf.contrib.metrics.streaming_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=logits))
         }
-    chto_hand = []
-    for item in metrics.values():
-        chto_hand.append(item[1])
     # Group the update ops for the tf.metrics
-    update_metrics_op = tf.group(*chto_hand)
+    update_metrics_op = tf.group(*[op for _, op in metrics.values()])
 
     # Get the op to reset the local variables used in tf.metrics
     metric_variables = tf.get_collection(tf.GraphKeys.LOCAL_VARIABLES, scope="metrics")
@@ -118,7 +145,7 @@ def model_fn(mode, inputs, params, reuse=False):
     for label in range(0, params.num_labels):
         mask_label = tf.logical_and(mask, tf.equal(predictions, label_argmax))
         incorrect_image_label = tf.boolean_mask(inputs['images'], mask_label)
-        tf.summary.image('incorrectly_labeled_{}'.format("label_argmax"), incorrect_image_label)
+        tf.summary.image('incorrectly_labeled_{}'.format(""), incorrect_image_label)
 
     # -----------------------------------------------------------
     # MODEL SPECIFICATION

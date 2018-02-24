@@ -11,7 +11,7 @@ from model.evaluation import evaluate_sess
 import model.utils as utils
 
 
-def train_sess(sess, model_spec, num_steps, writer, params, minibatch_iter, inputs):
+def train_sess(sess, model_spec, num_steps, writer, params, minibatch_iter, inputs, feeddatadict=None):
     """Train the model on `num_steps` batches
 
     Args:
@@ -35,19 +35,21 @@ def train_sess(sess, model_spec, num_steps, writer, params, minibatch_iter, inpu
     # Use tqdm for progress bar
     t = trange(num_steps)
     for i in t:
+
+        minibatch = minibatch_iter.__next__()
+        feed_dict = utils.createfeedDict(inputs,minibatch,feeddatadict=feeddatadict)
         # Evaluate summaries for tensorboard only once in a while
         if i % params.save_summary_steps == 0:
             # Perform a mini-batch update
-            minibatch = minibatch_iter.__next__()
             _, _, loss_val, summ, global_step_val = sess.run([train_op, update_metrics, loss,
-                                                              summary_op, global_step], feed_dict={inputs['images']:minibatch[0], inputs['labels']:minibatch[1]})
+                                                              summary_op, global_step], feed_dict=feed_dict)
             # Write summaries for tensorboard
             writer.add_summary(summ, global_step_val)
         else:
-            minibatch = minibatch_iter.__next__()
-            _, _, loss_val = sess.run([train_op, update_metrics, loss],feed_dict={inputs['images']:minibatch[0], inputs['labels']:minibatch[1]})
+            _, _, loss_val = sess.run([train_op, update_metrics, loss],feed_dict=feed_dict)
         # Log the loss in the tqdm progress bar
         t.set_postfix(loss='{:05.3f}'.format(loss_val))
+
 
 
     metrics_values = {k: v[0] for k, v in metrics.items()}
@@ -56,7 +58,7 @@ def train_sess(sess, model_spec, num_steps, writer, params, minibatch_iter, inpu
     logging.info("- Train metrics: " + metrics_string)
 
 
-def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params,train_inputs,eval_inputs, inputs, evalinputs, restore_from=None):
+def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params,train_inputs,eval_inputs, inputs, restore_from=None, traineddata=None, data=None):
     """Train the model and evaluate every epoch.
 
     Args:
@@ -71,7 +73,11 @@ def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params,trai
     last_saver = tf.train.Saver() # will keep last 5 epochs
     best_saver = tf.train.Saver(max_to_keep=1)  # only keep 1 best checkpoint (best on eval)
     begin_at_epoch = 0
-
+    feeddatadict=None
+    if data is not None:
+        feeddatadict={}
+        for index in range(len(data)):
+            feeddatadict[traineddata[index]] =  data[index].T
     with tf.Session() as sess:
         # Initialize model variables
         sess.run(train_model_spec['variable_init_op'])
@@ -97,7 +103,7 @@ def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params,trai
             eval_inputs.__initial__()
             # Compute number of batches in one epoch (one full pass over the training set)
             num_steps = (params.train_size + params.batch_size - 1) // params.batch_size
-            train_sess(sess, train_model_spec, num_steps, train_writer, params, minibatch_iter=train_inputs, inputs=inputs)
+            train_sess(sess, train_model_spec, num_steps, train_writer, params, minibatch_iter=train_inputs, inputs=inputs, feeddatadict=feeddatadict)
 
             # Save weights
             last_save_path = os.path.join(model_dir, 'last_weights', 'after-epoch')
@@ -106,7 +112,7 @@ def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params,trai
 
             # Evaluate for one epoch on validation set
             num_steps = (params.eval_size + params.batch_size - 1) // params.batch_size
-            metrics = evaluate_sess(sess, eval_model_spec, num_steps, writer=eval_writer, minibatch_iter=eval_inputs, inputs=evalinputs)
+            metrics = evaluate_sess(sess, eval_model_spec, num_steps, writer=eval_writer, minibatch_iter=eval_inputs, inputs=inputs, feeddatadict=feeddatadict)
 
             # If best_eval, best_save_path
             eval_acc = metrics['accuracy']

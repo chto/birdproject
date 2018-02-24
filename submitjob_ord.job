@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+#all commands that start with SBATCH contain commands that are just used by SLURM for scheduling
+#################
+#set a job name
+#SBATCH --job-name=bird_test_ord_runA1
+#################
+#a file for job output, you can check job progress
+#SBATCH --output=bird_test_ord_runA1.out
+#################
+# a file for errors from the job
+#SBATCH --error=bird_test_ord_runA1.err
+#################
+#time you think you need; default is one hour
+#in minutes
+# In this case, hh:mm:ss, select whatever time you want, the less you ask for the faster your job will run.
+# Default is one hour, this example will run in  less that 5 minutes.
+#SBATCH --time=2:00:00
+#################
+#SBATCH -p iric,normal
+#################
+#SBATCH --nodes=1
+#################
+#SBATCH --mem=8G
+#################
+
+srun python train.py --data_dir data/testdata/ --model_dir experiments/BirdCLF/ --noise_dir data/testdata/noise/
+#srun python train.py --data_dir data/testdata/ --model_dir experiments/base_model --noise_dir data/testdata/noise/

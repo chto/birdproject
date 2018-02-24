@@ -46,8 +46,8 @@ def readfiles(minibatch, noiseNames, add_noise_augmentation=False, number_of_thr
 
 
 class Batchiterator:
-    def __init__(self,fileNames, labels, noiseNames=None, params=None):
-       self.minibatches = random_mini_batches(fileNames,labels, mini_batch_size=params.batch_size) 
+    def __init__(self,fileNames, labels, noiseNames=None, params=None, is_eval=False):
+       self.minibatches = random_mini_batches(fileNames,labels, mini_batch_size=params.batch_size, is_eval=is_eval) 
        self.minibatchesIndex=0
        self.params = params
        self.noiseNames=noiseNames
@@ -67,7 +67,7 @@ class Batchiterator:
     def __initial__(self):
         self.minibatchesIndex=0
         self.minibatches = random_mini_batches(self.fileNames,self.labels, mini_batch_size=self.params.batch_size)
-def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
+def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0, is_eval=False):
     """
     Creates a list of random minibatches from (X, Y)
     
@@ -86,6 +86,8 @@ def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     np.random.seed(seed)
     
     # Step 1: Shuffle (X, Y)
+    if is_eval:
+        permutation = range(m)
     permutation = list(np.random.permutation(m))
     shuffled_X = X[permutation]
     shuffled_Y = Y[permutation]

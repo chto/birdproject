@@ -16,7 +16,7 @@ import numpy as np
 import model.utils as util
 import model.input_fn as input_fn
 import model.model_fn as model_fn
-
+import pickle
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', default='experiments/test',
@@ -45,7 +45,14 @@ if __name__ == '__main__':
     model_dir_has_best_weights=False
     overwritting = model_dir_has_best_weights and args.restore_from is None
     assert not overwritting, "Weights found in model_dir, aborting to avoid overwrite"
-
+    try:
+        fileName = os.path.join(args.model_dir, params.transferdata)
+        with open(fileName, 'rb') as f:
+            data = pickle.load(f)
+        logging.info("Reading transfer learning dataset")
+    except:
+        print("None transfer")
+        data = None
     # Set the logger
     set_logger(os.path.join(args.model_dir, 'train.log'))
 
@@ -70,21 +77,22 @@ if __name__ == '__main__':
     print("training_size:{0}, eval_size{1}".format(params.train_size, params.eval_size))
     # Create the two iterators over the two datasets
     train_inputs = input_fn.Batchiterator(train_filenames, train_labels_index, noise_filenames, params)
-    eval_inputs = input_fn.Batchiterator(eval_filenames, eval_labels_index, None, params)
+    eval_inputs = input_fn.Batchiterator(eval_filenames, eval_labels_index, None, params, is_eval=True)
     
     images =  tf.placeholder(tf.float32, shape=(None,228, 517,1), name="images")
     labels =  tf.placeholder(tf.float32, shape=(None,len(LabelMask)), name="labels")
-
-    evalimages =  tf.placeholder(tf.float32, shape=(None,228, 517,1), name="images")
-    evallabels =  tf.placeholder(tf.float32, shape=(None,len(LabelMask)), name="labels")
+    traineddata = [] 
+    if data is not None:
+        for i, item in enumerate(data):
+            item = np.array(item)
+            traineddata.append(tf.placeholder(tf.float32, shape=item.T.shape, name="transfer_data{0}".format(i)))
     inputs = {"images": images, "labels": labels}
-    evalinputs = {"images": evalimages, "labels": evallabels}
     # Define the model
     logging.info("Creating the model...")
-    train_model_spec = model_fn.model_fn('train', inputs, params)
-    eval_model_spec = model_fn.model_fn('eval', evalinputs, params, reuse=True)
+    train_model_spec = model_fn.model_fn('train', inputs, params, transferdata=traineddata)
+    eval_model_spec = model_fn.model_fn('eval', inputs, params, reuse=True, transferdata=traineddata)
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(train_model_spec, eval_model_spec, args.model_dir, params,train_inputs, eval_inputs,inputs, evalinputs, args.restore_from)
+    train_and_evaluate(train_model_spec, eval_model_spec, args.model_dir, params,train_inputs, eval_inputs,inputs, args.restore_from, traineddata=traineddata, data=data)
 

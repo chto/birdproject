@@ -108,3 +108,10 @@ def datatofileArrlable(datadir):
 def convert_to_one_hot(Y, C):
     Y = np.eye(C)[Y.astype(int).reshape(-1)].T
     return Y
+
+def createfeedDict(inputs,minibatch,feeddatadict=None):
+    feed_dict = {inputs['images']:minibatch[0], inputs['labels']:minibatch[1]} 
+    if feeddatadict is not None:
+        for keys in feeddatadict.keys():
+            feed_dict[keys] = feeddatadict[keys]
+    return feed_dict

@@ -7,9 +7,10 @@ from tqdm import trange
 import tensorflow as tf
 
 from model.utils import save_dict_to_json
+import model.utils as utils
 
 
-def evaluate_sess(sess, model_spec, num_steps, minibatch_iter, writer=None, params=None, inputs=None):
+def evaluate_sess(sess, model_spec, num_steps, minibatch_iter, writer=None, params=None, inputs=None,feeddatadict=None):
     """Train the model on `num_steps` batches.
 
     Args:
@@ -29,11 +30,17 @@ def evaluate_sess(sess, model_spec, num_steps, minibatch_iter, writer=None, para
     # compute metrics over the dataset
     for _ in range(num_steps):
         minibatch = minibatch_iter.__next__()
-        sess.run(update_metrics, feed_dict={inputs['images']:minibatch[0], inputs['labels']:minibatch[1]})
+        feed_dict = utils.createfeedDict(inputs,minibatch,feeddatadict=feeddatadict)
+        sess.run(update_metrics, feed_dict=feed_dict)
 
     # Get the values of the metrics
     metrics_values = {k: v[0] for k, v in eval_metrics.items()}
-    metrics_val = sess.run(metrics_values, feed_dict={inputs['images']:minibatch[0], inputs['labels']:minibatch[1]})
+    metrics_val = sess.run(metrics_values, feed_dict=feed_dict)
+    #testlabel = sess.run(model_spec['labels'], feed_dict={inputs['images']:minibatch[0], inputs['labels']:minibatch[1]})
+    #testpredict = sess.run(model_spec["predictions"], feed_dict={inputs['images']:minibatch[0], inputs['labels']:minibatch[1]})
+    #print(testlabel)
+    #print(testpredict)
+    #print(metrics_val)
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_val.items())
     logging.info("- Eval metrics: " + metrics_string)
 
